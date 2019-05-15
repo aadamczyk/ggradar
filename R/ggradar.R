@@ -7,10 +7,10 @@
 
 
 ggradar <- function(plot.data,
-                             base.size=15, 
+                             base.size=15,
                              font.radar="Arial",
-                             values.radar = c("0%", "50%", "100%"),                       
-                             axis.labels=colnames(plot.data)[-1],                             
+                             values.radar = c("0%", "50%", "100%"),
+                             axis.labels=colnames(plot.data)[-1],
                              grid.min=0,  #10,
                              grid.mid=0.5,  #50,
                              grid.max=1,  #100,
@@ -39,11 +39,13 @@ ggradar <- function(plot.data,
                              group.colours=NULL,
                              background.circle.colour="#D7D6D1",
                              background.circle.transparency=0.2,
-                             plot.legend=if (nrow(plot.data)>1) TRUE else FALSE,
+                             plot.legend=TRUE,
                              legend.title="",
                              plot.title="",
                              legend.text.size=14,
-                             legend.position = "left") {
+                             legend.position = "left",
+                             facet.charts = FALSE,
+                             facet.labels = TRUE) {
 
   library(ggplot2)
 
@@ -246,12 +248,21 @@ base <- base +  geom_path(data=gridline$max$path,aes(x=x,y=y),
 
 
   # ... + group (cluster) 'paths'
-  base <- base + geom_path(data=group$path,aes(x=x,y=y,group=group,colour=group),
+  base <- base + geom_polygon(data=group$path,aes(x=x,y=y,group=group,colour=group, alpha = .25, fill=group),
                            size=group.line.width)
 
   # ... + group points (cluster data)
   base <- base + geom_point(data=group$path,aes(x=x,y=y,group=group,colour=group),size=group.point.size)
 
+  # ... + facet charts
+  if (facet.charts == TRUE) base <- base + facet_grid(. ~ group)
+  # ... + add or remove facet labels
+  if (facet.labels == FALSE) {
+      base <- base + 
+          theme(strip.background = element_blank(),
+            strip.text.x = element_blank()
+      )
+  }
 
   #... + amend Legend title
   if (plot.legend==TRUE) base  <- base + labs(colour=legend.title,size=legend.text.size)
@@ -277,6 +288,7 @@ base <- base +  geom_path(data=gridline$max$path,aes(x=x,y=y),
   theme(legend.text = element_text(size = legend.text.size), legend.position = legend.position) +
   theme(legend.key.height=unit(2,"line")) +
   scale_colour_manual(values=colour_values) +
+  scale_fill_manual(values=colour_values) +
   theme(text=element_text(family=font.radar)) + 
   theme(legend.title=element_blank())
 
