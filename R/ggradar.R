@@ -9,28 +9,22 @@
 ggradar <- function(plot.data,
                              base.size=15,
                              font.radar="Arial",
-                             values.radar = c("0%", "50%", "100%"),
                              axis.labels=colnames(plot.data)[-1],
-                             grid.min=0,  #10,
-                             grid.mid=0.5,  #50,
-                             grid.max=1,  #100,
+                             grid.min = min(grid.lines),
+                             grid.max = max(grid.lines),
+                             grid.lines = c(0, .5, 1),
                              centre.y=grid.min - ((1/9)*(grid.max-grid.min)),
                              plot.extent.x.sf=1,
                              plot.extent.y.sf=1.2,
                              x.centre.range=0.02*(grid.max-centre.y),
                              label.centre.y=FALSE,
                              grid.line.width=0.5,
-                             gridline.min.linetype="longdash",
-                             gridline.mid.linetype="longdash",
-                             gridline.max.linetype="longdash",
-                             gridline.min.colour="grey",
-                             gridline.mid.colour="#007A87",
-                             gridline.max.colour="grey",
+                             gridline.linetype="longdash",
+                             gridline.colour="grey",
                              grid.label.size=6,
+                             grid.label.colour="grey60",
                              gridline.label.offset=-0.1*(grid.max-centre.y),
-                             label.gridline.min=TRUE,
-                             label.gridline.mid=TRUE,
-                             label.gridline.max=TRUE,
+                             label.gridlines=TRUE,
                              axis.label.offset=1.15,
                              axis.label.size=5,
                              axis.line.colour="grey",
@@ -171,24 +165,13 @@ funcCircleCoords <- function(center = c(0,0), r = 1, npoints = 100){
   axis$label$x <- sapply(1:n.vars, function(i, x) {((grid.max+abs(centre.y))*axis.label.offset)*sin(angles[i])})
   axis$label$y <- sapply(1:n.vars, function(i, x) {((grid.max+abs(centre.y))*axis.label.offset)*cos(angles[i])})
   #print(axis$label)
-  # (e) Create Circular grid-lines + labels
-  #caclulate the cooridinates required to plot circular grid-lines for three user-specified
-  #y-axis values: min, mid and max [grid.min; grid.mid; grid.max]
-  gridline <- NULL
-  gridline$min$path <- funcCircleCoords(c(0,0),grid.min+abs(centre.y),npoints = 360)
-  gridline$mid$path <- funcCircleCoords(c(0,0),grid.mid+abs(centre.y),npoints = 360)
-  gridline$max$path <- funcCircleCoords(c(0,0),grid.max+abs(centre.y),npoints = 360)
-  #print(head(gridline$max$path))
-  #gridline labels
-  gridline$min$label <- data.frame(x=gridline.label.offset,y=grid.min+abs(centre.y),
-                                   text=as.character(grid.min))
-  gridline$max$label <- data.frame(x=gridline.label.offset,y=grid.max+abs(centre.y),
-                                   text=as.character(grid.max))
-  gridline$mid$label <- data.frame(x=gridline.label.offset,y=grid.mid+abs(centre.y),
-                                   text=as.character(grid.mid))
-  #print(gridline$min$label)
-  #print(gridline$max$label)
-  #print(gridline$mid$label)
+  
+  #Instead of calculating the radius of each circle for each gridline separately, 
+  #we now create a one unit axis to use as the base for each gridline and a constant to
+  #offset it by.
+  unit.axis <- funcCircleCoords(center = c(0,0), r = 1, npoints = 360)
+  unit.axis.constant <- funcCircleCoords(center = c(0,0), r = abs(centre.y), npoints = 360)
+  
 ### Start building up the radar plot
 
 # Declare 'theme_clear', with or without a plot legend as required by user
@@ -221,13 +204,14 @@ base <- ggplot(axis$label) + xlab(NULL) + ylab(NULL) + coord_equal() +
   scale_x_continuous(limits=c(-1.5*plot.extent.x,1.5*plot.extent.x)) + 
   scale_y_continuous(limits=c(-plot.extent.y,plot.extent.y))
 
-# ... + circular grid-lines at 'min', 'mid' and 'max' y-axis values
-base <- base +  geom_path(data=gridline$min$path,aes(x=x,y=y),
-                          lty=gridline.min.linetype,colour=gridline.min.colour,size=grid.line.width)
-base <- base +  geom_path(data=gridline$mid$path,aes(x=x,y=y),
-                          lty=gridline.mid.linetype,colour=gridline.mid.colour,size=grid.line.width)
-base <- base +  geom_path(data=gridline$max$path,aes(x=x,y=y),
-                          lty=gridline.max.linetype,colour=gridline.max.colour,size=grid.line.width)
+# ... + create circular gridlines
+for (scalar in grid.lines) {
+    scaled.axis <- unit.axis * scalar
+    scaled.axis <- scaled.axis + unit.axis.constant
+    base <- base + geom_path(data=scaled.axis, aes(x=x,y=y),
+                              lty=gridline.linetype, colour=gridline.colour,
+                              size=grid.line.width)
+}
 
   # + axis labels for any vertical axes [abs(x)<=x.centre.range]
   base <- base + geom_text(data=subset(axis$label,abs(axis$label$x)<=x.centre.range),
@@ -238,14 +222,16 @@ base <- base +  geom_path(data=gridline$max$path,aes(x=x,y=y),
   # + theme_clear [to remove grey plot background, grid lines, axis tick marks and axis text]
   base <- base + theme_clear
   #  + background circle against which to plot radar data
-  base <- base + geom_polygon(data=gridline$max$path,aes(x,y),
+  gridline.max.path <- unit.axis * max(grid.lines)
+  gridline.max.path <- gridline.max.path + unit.axis.constant
+  
+  base <- base + geom_polygon(data=gridline.max.path,aes(x,y),
                               fill=background.circle.colour,
                               alpha=background.circle.transparency)
 
   # + radial axes
   base <- base + geom_path(data=axis$path,aes(x=x,y=y,group=axis.no),
                            colour=axis.line.colour)
-
 
   # ... + group (cluster) 'paths'
   base <- base + geom_polygon(data=group$path,aes(x=x,y=y,group=group,colour=group, alpha = .25, fill=group),
@@ -267,10 +253,21 @@ base <- base +  geom_path(data=gridline$max$path,aes(x=x,y=y),
   #... + amend Legend title
   if (plot.legend==TRUE) base  <- base + labs(colour=legend.title,size=legend.text.size)
 
-  # ... + grid-line labels (max; mid; min)
-  if (label.gridline.min==TRUE) { base <- base + geom_text(aes(x=x,y=y,label=values.radar[1]),data=gridline$min$label,size=grid.label.size*0.8, hjust=1, family=font.radar) }
-  if (label.gridline.mid==TRUE) { base <- base + geom_text(aes(x=x,y=y,label=values.radar[2]),data=gridline$mid$label,size=grid.label.size*0.8, hjust=1, family=font.radar) }
-  if (label.gridline.max==TRUE) { base <- base + geom_text(aes(x=x,y=y,label=values.radar[3]),data=gridline$max$label,size=grid.label.size*0.8, hjust=1, family=font.radar) }
+  #... + grid-line labels
+  if (label.gridlines==TRUE) { 
+      grid.line.labels <- data.frame(x = gridline.label.offset,
+                                     y = grid.lines + abs(centre.y),
+                                     text=as.character(grid.lines))
+          
+      base <- base + geom_text(aes(x=x,y=y, label=grid.line.labels$text),
+                                   data=grid.line.labels,
+                                   size=grid.label.size*0.8, 
+                                   color = grid.label.colour,
+                                   hjust=1,
+                                   family=font.radar)
+  }
+  
+  
   # ... + centre.y label if required [i.e. value of y at centre of plot circle]
   if (label.centre.y==TRUE) {
     centre.y.label <- data.frame(x=0, y=0, text=as.character(centre.y))
