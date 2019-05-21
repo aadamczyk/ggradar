@@ -23,6 +23,7 @@ ggradar <- function(plot.data,
                              gridline.colour="grey",
                              grid.label.size=6,
                              grid.label.colour="grey60",
+                             grid.label.degrees=315,
                              gridline.label.offset=-0.1*(grid.max-centre.y),
                              label.gridlines=TRUE,
                              axis.label.offset=1.15,
@@ -167,7 +168,7 @@ funcCircleCoords <- function(center = c(0,0), r = 1, npoints = 100){
   #print(axis$label)
   
   #Instead of calculating the radius of each circle for each gridline separately, 
-  #we now create a one unit axis to use as the base for each gridline and a constant to
+  #create a one unit axis to use as the base for each gridline and a constant to
   #offset it by.
   unit.axis <- funcCircleCoords(center = c(0,0), r = 1, npoints = 360)
   unit.axis.constant <- funcCircleCoords(center = c(0,0), r = abs(centre.y), npoints = 360)
@@ -255,8 +256,13 @@ for (scalar in grid.lines) {
 
   #... + grid-line labels
   if (label.gridlines==TRUE) { 
-      grid.line.labels <- data.frame(x = gridline.label.offset,
-                                     y = grid.lines + abs(centre.y),
+      axis.label.radians <- grid.label.degrees / 360 * 2 * pi
+      unit.axis.x <- sin(axis.label.radians)
+      unit.axis.y <- cos(axis.label.radians)
+      
+      grid.line.labels <- data.frame(x = ((unit.axis.x * grid.lines)),
+                                     y = ((grid.lines * unit.axis.y) + 
+                                              sin(abs(centre.y))),
                                      text=as.character(grid.lines))
           
       base <- base + geom_text(aes(x=x,y=y, label=grid.line.labels$text),
